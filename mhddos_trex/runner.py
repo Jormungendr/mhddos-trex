@@ -50,7 +50,14 @@ class Runner:
         from trex.stl.api import STLClient
 
         self._client = STLClient(server=self.server, verbose_level="error")
-        self._client.connect()
+        try:
+            self._client.connect()
+        except Exception as error:  # noqa: BLE001 - any failure means the server is not up
+            self._client = None
+            raise SystemExit(
+                f"TRex server unreachable at {self.server}: {error}\n"
+                "start the TRex service on that host, or point --server at the running one"
+            ) from error
         self._client.acquire(ports=[self.port], force=True)
         return self
 
