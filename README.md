@@ -87,3 +87,6 @@ pytest -q
 
 No TRex server needed: streams compile to profile JSON locally, and the MHDDoS source is
 parsed to cross-check every extracted constant.
+
+Lab verification runs against the TRex host over SSH, the same way the existing lab
+scripts do. That step is manual and needs the TRex service up.
