@@ -180,6 +180,16 @@ def _dport(name: str, run: RunSpec, source) -> int:
     return run.dport
 
 
+def _l7_len(pkt) -> int:
+    """Bytes this frame puts in the TCP stream, padding included.
+
+    The sequence number must advance by exactly what the segment carries, so this is read
+    off the finished packet rather than the payload the builder produced - trimming and
+    padding both change the length.
+    """
+    return len(bytes(pkt[TCP].payload)) if pkt.haslayer(TCP) else 0
+
+
 def build_streams(name: str, run: RunSpec, link: LinkSpec, ctx: BuildCtx, source) -> list[STLStream]:
     spec = SPECS[name]
     if spec.verdict not in (Verdict.WIRE, Verdict.SHAPE):
@@ -198,20 +208,24 @@ def build_streams(name: str, run: RunSpec, link: LinkSpec, ctx: BuildCtx, source
         payload = spec.build(ctx, index, source) if spec.build else b""
 
         if spec.src_mode is SrcMode.REFLECTOR:
-            dst, src = reflectors[index % len(reflectors)], run.victim
-            vm = _vm_reflector(spec, reflectors)
+            src, dst = run.victim, reflectors[index % len(reflectors)]
         elif spec.src_mode is SrcMode.RANDOM:
-            dst, src = run.victim, sources[0]
-            vm = _vm_spoof(spec, low, high)
+            src, dst = sources[0], run.victim
         else:
-            dst, src = run.victim, sources[index]
-            vm = _vm_pool(spec, len(payload))
+            src, dst = sources[index], run.victim
 
         sport = run.dport if spec.src_mode is SrcMode.REFLECTOR else SPORT_START + index
         pkt = _l2(link) / IP(src=src, dst=dst) / _l4(spec, dport, sport)
         if payload:
             pkt = pkt / Raw(payload)
         pkt = _pad(_fit(pkt, max(MAX_ETHERNET_FRAME, run.size or 0)), run.size)
+
+        if spec.src_mode is SrcMode.REFLECTOR:
+            vm = _vm_reflector(spec, reflectors)
+        elif spec.src_mode is SrcMode.RANDOM:
+            vm = _vm_spoof(spec, low, high)
+        else:
+            vm = _vm_pool(spec, _l7_len(pkt))
 
         streams.append(
             STLStream(
