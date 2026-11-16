@@ -92,8 +92,6 @@ class Source:
     """Everything the stream builder needs, lifted verbatim from MHDDoS."""
 
     methods: frozenset[str]
-    layer4: frozenset[str]
-    layer7: frozenset[str]
     amplifiers: dict[str, tuple[bytes, int]]
     protocol_payloads: dict[str, bytes]
     ovh_udp_methods: tuple[str, ...]
@@ -144,8 +142,6 @@ def load(directory: Path) -> Source:
     files = root / "files"
     return Source(
         methods=frozenset({*layer4, *layer7}),
-        layer4=layer4,
-        layer7=layer7,
         amplifiers=amplifiers,
         protocol_payloads=protocol_payloads,
         ovh_udp_methods=ovh_methods,
