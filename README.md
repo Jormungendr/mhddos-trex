@@ -100,5 +100,29 @@ TREX_SIM_DIR=/tmp/trex-build/linux pytest -q
 ```
 
 That covers frame sizes, source/destination addressing, sequence continuity and the
-hardware-offload checksum the spoofed profiles depend on. Rate and loss against the
-scrubbing DUT still need the TRex host with its service up.
+hardware-offload checksum the spoofed profiles depend on.
+
+`tests/test_live.py` drives a real STL server over ZMQ — acquire, load, transmit, read the
+per-port counters, release. Skipped unless `TREX_SERVER` names one:
+
+```sh
+TREX_SERVER=127.0.0.1 pytest tests/test_live.py -q
+```
+
+## Measured
+
+TRex v3.08 on `net_null` ports, 8 flows, 3-second runs, zero output errors. The rate the
+operator asked for is the rate that leaves the port:
+
+| Profile | asked | transmitted | L1 |
+|---|---|---|---|
+| GET | 1M pps | 1,000,000 pps | 5.3 Gbps |
+| UDP | 1M pps | 1,000,000 pps | 8.6 Gbps |
+| SYN | 1M pps | 1,000,000 pps | 0.5 Gbps |
+| GET | 10M pps | 10,000,000 pps | 53 Gbps |
+| UDP | 10M pps | 10,000,000 pps | 86 Gbps |
+| SYN | 10M pps | 10,000,000 pps | 5.1 Gbps |
+
+MHDDoS's own Python loop tops out orders of magnitude below this. The numbers are per
+server core, on a port that discards its output, so they measure the generator and not the
+link; a real NIC and the scrubbing DUT add their own ceiling.
