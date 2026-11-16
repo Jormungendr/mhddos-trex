@@ -155,6 +155,23 @@ def test_padding_is_off_by_default(source):
     assert len(bytes(pkt)) < 200
 
 
+def test_no_frame_exceeds_the_ethernet_mtu(source):
+    """APACHE, STOMP and STRESS build multi-kilobyte requests. MHDDoS lets the kernel
+    segment them; TRex cannot, so the payload is trimmed rather than sent as a jumbo
+    frame the first switch would drop."""
+    for name in catalog.emittable():
+        for stream in build_streams(name, run(flows=1), LINK, ctx(source), source):
+            assert len(bytes(frame(stream))) <= 1518, name
+
+
+def test_oversized_request_keeps_its_shape_after_trimming(source):
+    pkt = frame(build_streams("APACHE", run(flows=1), LINK, ctx(source), source)[0])
+    payload = bytes(pkt[Raw].load)
+    assert payload.startswith(b"GET / HTTP/1.1\r\n")
+    assert b"Range: bytes=0-," in payload
+    assert payload.endswith(b"\r\n\r\n")
+
+
 def test_amplifier_ports_come_from_the_spec(source):
     expected = {"DNS": 53, "NTP": 123, "MEM": 11211, "CLDAP": 389, "CHAR": 19, "ARD": 3283, "RDP": 3389}
     for name, port in expected.items():

@@ -40,6 +40,7 @@ L4_NAME = {Proto.UDP: "UDP", Proto.TCP: "TCP"}
 SEQ_START = 0x1000
 SPORT_START = 1024
 SPORT_SPAN = 60000
+MAX_ETHERNET_FRAME = 1518
 
 
 def _l2(link: LinkSpec) -> Ether:
@@ -53,6 +54,27 @@ def _l4(spec: AttackSpec, dport: int, sport: int):
     if spec.proto is Proto.UDP:
         return UDP(sport=sport, dport=dport, chksum=0)
     return ICMP(type=8, id=SEQ_START & 0xFFFF)
+
+
+def _fit(pkt):
+    """Trim the payload so the frame fits a normal Ethernet MTU.
+
+    MHDDoS hands a multi-kilobyte request to the kernel, which splits it into MSS-sized
+    TCP segments. TRex sends one stream's payload in one frame and cannot segment, so an
+    oversized payload would leave as a jumbo frame and be dropped by the first switch -
+    the scrubber would see nothing and the run would prove nothing. The request keeps its
+    start and its header terminator, so it stays a well-formed request; only its length
+    differs.
+    """
+    if len(pkt) <= MAX_ETHERNET_FRAME or not pkt.haslayer(Raw):
+        return pkt
+    body = bytes(pkt[Raw].load)
+    keep = len(body) - (len(pkt) - MAX_ETHERNET_FRAME)
+    terminator = b"\r\n\r\n" if body.endswith(b"\r\n\r\n") else b""
+    head = body[: max(0, keep - len(terminator))]
+    trimmed = pkt.copy()
+    trimmed[Raw].load = head + terminator
+    return trimmed
 
 
 def _pad(pkt, size: int | None):
@@ -188,7 +210,7 @@ def build_streams(name: str, run: RunSpec, link: LinkSpec, ctx: BuildCtx, source
         pkt = _l2(link) / IP(src=src, dst=dst) / _l4(spec, dport, sport)
         if payload:
             pkt = pkt / Raw(payload)
-        pkt = _pad(pkt, run.size)
+        pkt = _pad(_fit(pkt), run.size)
 
         streams.append(
             STLStream(
