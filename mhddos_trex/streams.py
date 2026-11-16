@@ -141,11 +141,10 @@ def _src_pool(prefix: str, flows: int) -> list[str]:
     return [str(ipaddress.ip_address(first + (i % span))) for i in range(flows)]
 
 
-def _dport(name: str, spec: AttackSpec, run: RunSpec, source) -> int:
-    """A method's own port wins; amplifiers carry theirs in MHDDoS's table."""
-    if spec.dport:
-        return spec.dport
-    if spec.src_mode is SrcMode.REFLECTOR and name in source.amplifiers:
+def _dport(name: str, run: RunSpec, source) -> int:
+    """MHDDoS sends protocol queries to the target port and amplifier requests to the
+    reflector's own port, so only the reflector table overrides ``--dport``."""
+    if name in source.amplifiers:
         return source.amplifiers[name][1]
     return run.dport
 
@@ -155,7 +154,7 @@ def build_streams(name: str, run: RunSpec, link: LinkSpec, ctx: BuildCtx, source
     if spec.verdict not in (Verdict.WIRE, Verdict.SHAPE):
         raise ValueError(f"{name} is not emittable: {spec.verdict.value}")
 
-    dport = _dport(name, spec, run, source)
+    dport = _dport(name, run, source)
     per_stream = max(1, run.pps // max(1, run.flows))
     net = ipaddress.ip_network(run.src_prefix, strict=False)
     low = int(net.network_address) + 1

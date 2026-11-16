@@ -244,11 +244,11 @@ _register(
     AttackSpec("UDP", WIRE, Proto.UDP, udp, src_mode=SrcMode.RANDOM),
     AttackSpec("OVH-UDP", WIRE, Proto.UDP, ovh_udp, src_mode=SrcMode.RANDOM),
     AttackSpec("ICMP", WIRE, Proto.ICMP, icmp, src_mode=SrcMode.RANDOM),
-    AttackSpec("VSE", WIRE, Proto.UDP, _protocol("VSE"), dport=27015, src_mode=SrcMode.RANDOM),
-    AttackSpec("TS3", WIRE, Proto.UDP, _protocol("TS3"), dport=9987, src_mode=SrcMode.RANDOM),
-    AttackSpec("MCPE", WIRE, Proto.UDP, _protocol("MCPE"), dport=19132, src_mode=SrcMode.RANDOM),
-    AttackSpec("FIVEM", WIRE, Proto.UDP, _protocol("FIVEM"), dport=30120, src_mode=SrcMode.RANDOM),
-    AttackSpec("FIVEM-TOKEN", WIRE, Proto.UDP, fivem_token, dport=30120, src_mode=SrcMode.RANDOM),
+    AttackSpec("VSE", WIRE, Proto.UDP, _protocol("VSE"), src_mode=SrcMode.RANDOM),
+    AttackSpec("TS3", WIRE, Proto.UDP, _protocol("TS3"), src_mode=SrcMode.RANDOM),
+    AttackSpec("MCPE", WIRE, Proto.UDP, _protocol("MCPE"), src_mode=SrcMode.RANDOM),
+    AttackSpec("FIVEM", WIRE, Proto.UDP, _protocol("FIVEM"), src_mode=SrcMode.RANDOM),
+    AttackSpec("FIVEM-TOKEN", WIRE, Proto.UDP, fivem_token, src_mode=SrcMode.RANDOM),
     *(
         AttackSpec(name, WIRE, Proto.UDP, _amplifier(name), src_mode=SrcMode.REFLECTOR)
         for name in ("MEM", "NTP", "DNS", "CHAR", "CLDAP", "ARD", "RDP")

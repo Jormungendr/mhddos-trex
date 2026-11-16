@@ -162,11 +162,11 @@ def test_amplifier_ports_come_from_the_spec(source):
         assert pkt[UDP].dport == port, name
 
 
-def test_protocol_ports_override_the_run_port(source):
-    expected = {"VSE": 27015, "TS3": 9987, "MCPE": 19132, "FIVEM": 30120, "FIVEM-TOKEN": 30120}
-    for name, port in expected.items():
-        pkt = frame(build_streams(name, run(dport=1), LINK, ctx(source), source)[0])
-        assert pkt[UDP].dport == port, name
+def test_protocol_queries_go_to_the_target_port(source):
+    """MHDDoS sends VSE/TS3/MCPE/FIVEM to the target's own port, not a protocol default."""
+    for name in ("VSE", "TS3", "MCPE", "FIVEM", "FIVEM-TOKEN"):
+        pkt = frame(build_streams(name, run(dport=27015), LINK, ctx(source), source)[0])
+        assert pkt[UDP].dport == 27015, name
 
 
 def test_payloads_differ_between_streams(source):
