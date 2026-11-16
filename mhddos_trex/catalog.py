@@ -45,15 +45,27 @@ def _noise(size: int, index: int) -> bytes:
     """
     return os.urandom(size)
 
-def get(ctx, index, source):
+def _get_like(
+    ctx,
+    index,
+    source,
+    host: str | None = None,
+    extra: str = "",
+    headers: str | None = None,
+) -> bytes:
     ua, ref, spoof = _identity(ctx, index)
     return (
         "GET / HTTP/1.1\r\n"
         + source.browser_headers
-        + f"Host: {ctx.authority}\r\n"
-        + _forwarded(ctx, ua, ref, spoof)
+        + f"Host: {host or ctx.authority}\r\n"
+        + (headers if headers is not None else _forwarded(ctx, ua, ref, spoof))
+        + extra
         + "\r\n"
     ).encode()
+
+
+def get(ctx, index, source):
+    return _get_like(ctx, index, source)
 
 
 def head(ctx, index, source):
@@ -88,37 +100,22 @@ def pps(ctx, index, source):
 
 
 def null(ctx, index, source):
-    ua, ref, spoof = _identity(ctx, index)
-    return (
-        "GET / HTTP/1.1\r\n"
-        + source.browser_headers
-        + f"Host: {ctx.authority}\r\n"
-        "User-Agent: null\r\nReferrer: null\r\n"
-        + _forwarded(ctx, ua, ref, spoof)
-        + "\r\n"
-    ).encode()
+    return _get_like(
+        ctx, index, source, headers="User-Agent: null\r\nReferrer: null\r\n"
+    )
 
 
 def cookie(ctx, index, source):
-    ua, ref, spoof = _identity(ctx, index)
-    return (
-        "GET / HTTP/1.1\r\n"
-        + source.browser_headers
-        + f"Host: {ctx.authority}\r\n"
-        + _forwarded(ctx, ua, ref, spoof)
-        + f"Cookie: _ga=GA{1000 + index}; _gat=1; __cfduid={_noise(16, index).hex()};\r\n\r\n"
-    ).encode()
+    return _get_like(
+        ctx,
+        index,
+        source,
+        extra=f"Cookie: _ga=GA{1000 + index}; _gat=1; __cfduid={_noise(16, index).hex()};\r\n",
+    )
 
 
 def dyn(ctx, index, source):
-    ua, ref, spoof = _identity(ctx, index)
-    return (
-        "GET / HTTP/1.1\r\n"
-        + source.browser_headers
-        + f"Host: {_noise(3, index).hex()}.{ctx.authority}\r\n"
-        + _forwarded(ctx, ua, ref, spoof)
-        + "\r\n"
-    ).encode()
+    return _get_like(ctx, index, source, host=f"{_noise(3, index).hex()}.{ctx.authority}")
 
 
 def rhex(ctx, index, source):
