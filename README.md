@@ -22,6 +22,11 @@ Use the interpreter TRex ships (`/opt/trex-python/bin/python3`). The vendored sc
 required: TRex annotates each scapy field with the byte offset its field engine resolves,
 and a stock scapy does not.
 
+`scripts/install-remote.sh` deploys the package, an MHDDoS checkout and a `mhddos-trex`
+wrapper onto a TRex host, and installs this guide beside it as `AGENT-USAGE.md`. The lab VM
+at `root@10.172.10.34` is deployed that way; [docs/agent-usage-261116.md](docs/agent-usage-261116.md)
+is what an agent should read before driving it.
+
 ## Use
 
 ```sh
