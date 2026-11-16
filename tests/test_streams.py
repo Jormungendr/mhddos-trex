@@ -181,6 +181,12 @@ def test_source_pool_stays_inside_the_prefix(source):
     assert all(ipaddress.ip_address(frame(s)[IP].src) in net for s in streams)
 
 
+def test_host_prefix_collapses_to_the_single_address(source):
+    """A /32 has no host range; stepping past it would forge an address nobody configured."""
+    streams = build_streams("GET", run(flows=4, src_prefix="198.18.5.10/32"), LINK, ctx(source), source)
+    assert {frame(s)[IP].src for s in streams} == {"198.18.5.10"}
+
+
 def test_syn_has_no_payload(source):
     pkt = frame(build_streams("SYN", run(), LINK, ctx(source), source)[0])
     assert pkt[TCP].flags == "S"

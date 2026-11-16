@@ -135,9 +135,17 @@ def _vm_reflector(spec: AttackSpec, reflectors: tuple[str, ...]) -> STLScVmRaw:
 
 
 def _src_pool(prefix: str, flows: int) -> list[str]:
+    """Synthetic clients drawn from the configured prefix.
+
+    A /32 or /31 has no usable host range, so the address itself is used rather than
+    stepping outside the prefix the operator asked for.
+    """
     net = ipaddress.ip_network(prefix, strict=False)
     first = int(net.network_address) + 1
-    span = max(1, int(net.broadcast_address) - first)
+    last = int(net.broadcast_address) - 1
+    if last <= first:
+        return [str(net.network_address)] * flows
+    span = last - first + 1
     return [str(ipaddress.ip_address(first + (i % span))) for i in range(flows)]
 
 
