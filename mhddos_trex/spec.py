@@ -38,7 +38,7 @@ class AttackSpec:
     verdict: Verdict
     proto: Proto
     build: Callable | None = None
-    dport: int = PORT_ANY
+    dport: int = 0
     flags: str = "PA"
     src_mode: SrcMode = SrcMode.POOL
 
