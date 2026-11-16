@@ -31,16 +31,6 @@ def locate(explicit: str | os.PathLike | None = None) -> Path:
     )
 
 
-def _const_str(node: ast.AST) -> str | None:
-    """Concatenate the implicit string literals of a ``"a" "b"`` / ``"a" + "b"`` chain."""
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-        left, right = _const_str(node.left), _const_str(node.right)
-        return left + right if left is not None and right is not None else None
-    return None
-
-
 def _static_parts(node: ast.AST) -> str:
     """Gather the literal sub-strings of a chain that also concatenates runtime values.
 

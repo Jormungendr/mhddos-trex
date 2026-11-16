@@ -26,11 +26,6 @@ class Verdict(Enum):
     CLIENT_LOGIC = "client_logic"
 
 
-EMITTABLE = (Verdict.WIRE, Verdict.SHAPE)
-
-PORT_ANY = 0
-
-
 @dataclass(frozen=True)
 class AttackSpec:
     """One MHDDoS method reduced to what the wire can carry.
