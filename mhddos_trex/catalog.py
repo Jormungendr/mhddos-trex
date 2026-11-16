@@ -37,9 +37,13 @@ def _forwarded(ctx: BuildCtx, ua: str, ref: str, spoof: str) -> str:
 
 
 def _noise(size: int, index: int) -> bytes:
-    """Deterministic high-entropy bytes: the field engine cannot randomize payloads."""
-    seed = os.urandom(8) + index.to_bytes(4, "big")
-    return (seed * (size // len(seed) + 1))[:size]
+    """Independent random bytes per stream.
+
+    MHDDoS calls ``os.urandom`` per packet. Bytes are fixed once a stream is compiled, so
+    the entropy has to be real: a repeating filler would give the payload a period that
+    entropy-based classification can key on.
+    """
+    return os.urandom(size)
 
 def get(ctx, index, source):
     ua, ref, spoof = _identity(ctx, index)
