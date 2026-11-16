@@ -14,11 +14,9 @@ def build_ctx(source, host: str, port: int) -> BuildCtx:
 
 
 def resolve_target(args) -> tuple[str, int]:
-    host = args.host
-    if host is None:
+    if args.host is None:
         raise SystemExit("--host must be set to the victim hostname (MHDDoS builds Host: from it)")
-    port = args.dport or (443 if args.scheme == "https" else 80)
-    return host, port
+    return args.host, args.dport or (443 if args.scheme == "https" else 80)
 
 
 def make_run_spec(args) -> RunSpec:
@@ -28,7 +26,7 @@ def make_run_spec(args) -> RunSpec:
         reflectors = tuple(dict.fromkeys(line.split()[0] for line in text.splitlines() if line.strip()))
     return RunSpec(
         victim=args.victim,
-        dport=args.dport,
+        dport=resolve_target(args)[1],
         pps=args.pps,
         flows=args.flows,
         src_prefix=args.src_prefix,
