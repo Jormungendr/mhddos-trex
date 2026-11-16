@@ -88,5 +88,17 @@ pytest -q
 No TRex server needed: streams compile to profile JSON locally, and the MHDDoS source is
 parsed to cross-check every extracted constant.
 
-Lab verification runs against the TRex host over SSH, the same way the existing lab
-scripts do. That step is manual and needs the TRex service up.
+`tests/test_dataplane.py` goes further and executes every profile in TRex's own C++ data
+plane, then reads the emitted frames back out of a pcap. Build the simulator once and
+point `TREX_SIM_DIR` at it:
+
+```sh
+cd ../trex-core/linux
+python3 ./waf-2.0.21 configure -o /tmp/trex-build
+python3 ./waf-2.0.21 build -o /tmp/trex-build --targets=bp-sim-64
+TREX_SIM_DIR=/tmp/trex-build/linux pytest -q
+```
+
+That covers frame sizes, source/destination addressing, sequence continuity and the
+hardware-offload checksum the spoofed profiles depend on. Rate and loss against the
+scrubbing DUT still need the TRex host with its service up.
