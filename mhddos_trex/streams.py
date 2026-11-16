@@ -122,7 +122,12 @@ def _checksum(spec: AttackSpec) -> list:
 
 
 def _vm_pool(spec: AttackSpec, payload_len: int) -> STLScVmRaw | None:
-    """TCP continuity: one flow per stream, sequence advancing with the payload."""
+    """TCP continuity: one flow per stream, sequence advancing with the payload.
+
+    The range must cover the whole 32-bit space. A short range wraps in a few dozen
+    packets and every wrap steps the sequence backwards, which a receiver reads as
+    retransmission or out-of-window data - the flow stops being a coherent client.
+    """
     if spec.proto is not Proto.TCP:
         return None
     return STLScVmRaw(
@@ -130,7 +135,7 @@ def _vm_pool(spec: AttackSpec, payload_len: int) -> STLScVmRaw | None:
             STLVmFlowVar(
                 name="seq",
                 min_value=SEQ_START,
-                max_value=SEQ_START + 0xFFFF,
+                max_value=2**32 - 1,
                 step=max(1, payload_len),
                 size=4,
                 op="inc",
