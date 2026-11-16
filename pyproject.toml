@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mhddos-trex"
+version = "0.1.0"
+description = "MHDDoS attack shapes expressed as TRex stateless profiles"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+mhddos-trex = "mhddos_trex.cli:main"
+
+[tool.setuptools]
+packages = ["mhddos_trex"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
