@@ -126,8 +126,12 @@ def _vm_spoof(spec: AttackSpec, low: int, high: int) -> STLScVmRaw:
 
 
 def _vm_reflector(spec: AttackSpec, reflectors: tuple[str, ...]) -> STLScVmRaw:
-    """Destination rotates over the reflector list; source claims to be the victim."""
-    return STLScVmRaw(_sport(spec) + _cycle("dst", "IP.dst", reflectors) + _checksum(spec))
+    """Destination rotates over the reflector list; the rest of the request is fixed.
+
+    Source address and port are the victim's own - that is where the reflector's reply
+    goes, and what MHDDoS puts in ``uh_sport``.
+    """
+    return STLScVmRaw(_cycle("dst", "IP.dst", reflectors) + _checksum(spec))
 
 
 def _src_pool(prefix: str, flows: int) -> list[str]:
@@ -173,7 +177,8 @@ def build_streams(name: str, run: RunSpec, link: LinkSpec, ctx: BuildCtx, source
             dst, src = run.victim, sources[index]
             vm = _vm_pool(spec, len(payload))
 
-        pkt = _l2(link) / IP(src=src, dst=dst) / _l4(spec, dport, SPORT_START + index)
+        sport = run.dport if spec.src_mode is SrcMode.REFLECTOR else SPORT_START + index
+        pkt = _l2(link) / IP(src=src, dst=dst) / _l4(spec, dport, sport)
         if payload:
             pkt = pkt / Raw(payload)
         pkt = _pad(pkt, run.size)

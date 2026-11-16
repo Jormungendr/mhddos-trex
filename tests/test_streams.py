@@ -105,11 +105,19 @@ def test_spoofed_modes_rewrite_and_repair_checksums(source):
 
 
 def test_reflector_sends_from_victim_to_reflector(source):
-    streams = build_streams("DNS", run(reflectors=REFLECTORS), LINK, ctx(source), source)
-    for stream in streams:
+    for stream in build_streams("DNS", run(reflectors=REFLECTORS), LINK, ctx(source), source):
         pkt = frame(stream)
         assert pkt[IP].src == "198.19.0.2"
         assert pkt[IP].dst in REFLECTORS
+        assert pkt[UDP].dport == 53
+
+
+def test_reflector_request_keeps_the_victim_port_as_source(source):
+    """The reflector replies to the victim's port, so that is what the source port must be."""
+    streams = build_streams("DNS", run(dport=8080, reflectors=REFLECTORS), LINK, ctx(source), source)
+    for stream in streams:
+        pkt = frame(stream)
+        assert pkt[UDP].sport == 8080
         assert pkt[UDP].dport == 53
 
 
