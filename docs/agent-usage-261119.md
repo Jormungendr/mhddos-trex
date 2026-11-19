@@ -84,10 +84,11 @@ mhddos-trex run all --victim 198.19.0.100 --carpet 198.19.0.0/24 --pps 50 --seco
 ```
 
 The field engine draws the address per packet, so the prefix size is what makes the attack
-wide, not the flow count. Source addresses are spoofed too, and because no host is hit
-twice there is no TCP session to keep coherent; `--victim` still only supplies the `Host:`
-header. Naming an amplification profile together with `--carpet` is refused (the reflector
-list *is* the destination); `run all --carpet` silently drops those seven.
+wide, not the flow count. Source addresses are spoofed too, drawn from `--src-prefix`, and
+because no host is hit twice there is no TCP session to keep coherent; `--victim` still
+only supplies the `Host:` header. Naming an amplification profile together with `--carpet`
+is refused (the reflector list *is* the destination); `run all --carpet` silently drops
+those seven.
 
 ## Safety for an automated caller
 
