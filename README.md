@@ -24,7 +24,7 @@ and a stock scapy does not.
 
 `scripts/install-remote.sh` deploys the package, an MHDDoS checkout and a `mhddos-trex`
 wrapper onto a TRex host, and installs this guide beside it as `AGENT-USAGE.md`. The lab VM
-at `root@10.172.10.34` is deployed that way; [docs/agent-usage-261116.md](docs/agent-usage-261116.md)
+at `root@10.172.10.34` is deployed that way; [docs/agent-usage-261119.md](docs/agent-usage-261119.md)
 is what an agent should read before driving it.
 
 ## Use
@@ -35,6 +35,7 @@ mhddos-trex dry-run GET --victim 198.19.0.2 --flows 64   # print the compiled pr
 mhddos-trex run GET POST --victim 198.19.0.2 --pps 1000000 --seconds 30
 mhddos-trex run all --victim 198.19.0.2 --pps 50000 --seconds 5   # smoke every profile
 mhddos-trex run DNS --victim 198.19.0.2 --reflectors reflectors.txt --pps 200000
+mhddos-trex run SYN UDP --victim 198.19.0.2 --carpet 198.19.0.0/24   # carpet bombing
 ```
 
 MHDDoS's own checkout is located via `--mhddos-dir` or `MHDDOS_DIR`. It is read, never
@@ -42,6 +43,13 @@ executed: payload constants and wordlists are lifted from `start.py` with `ast`,
 package carries no second copy of them and follows an upstream update without code change.
 
 `--host` sets the hostname used in `Host:` when it differs from the packet destination.
+
+`--carpet <cidr>` turns any profile into carpet bombing: the field engine draws a fresh
+destination address inside the prefix for every packet, and because no packet targets the
+same host twice there is no coherent client left, so the source is spoofed as well. The
+payload, port and rate are unchanged; `--victim` still supplies the `Host:` header. A
+reflector list is itself the destination, so the two cannot be combined — `run all
+--carpet` therefore skips the seven amplification profiles instead of refusing.
 
 ## What is reproduced
 
@@ -67,6 +75,10 @@ rotating over the reflector list. Amplified response volume needs a real reflect
   the payload length, so a scrubber reassembles a coherent request stream from one client.
 - **random / reflector** (UDP, ICMP, amplifiers): `IP.src` or `IP.dst` and `sport`
   rewritten per packet by the field engine — a spoofed flood.
+- **carpet** (`--carpet <cidr>`, any profile): `IP.dst` drawn at random inside the prefix
+  per packet, with the source spoofed the same way. It overrides the pool model, because a
+  stream whose packets never reach the same host cannot be one client, and `TCP.seq` then
+  stays fixed instead of advancing.
 
 Rewritten headers invalidate both checksums, so those streams carry a repair instruction:
 `STLVmFixChecksumHw` uses NIC TX offload (TRex has no software L4 checksum instruction),

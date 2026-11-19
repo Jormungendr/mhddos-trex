@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from . import catalog, mhddos
-from .spec import BuildCtx, LinkSpec, RunSpec, Verdict
+from .spec import BuildCtx, LinkSpec, RunSpec, SrcMode, Verdict
 
 
 def build_ctx(source, host: str, port: int) -> BuildCtx:
@@ -32,6 +32,7 @@ def make_run_spec(args) -> RunSpec:
         src_prefix=args.src_prefix,
         size=args.size,
         reflectors=reflectors,
+        carpet=args.carpet,
     )
 
 
@@ -115,6 +116,7 @@ def parser() -> argparse.ArgumentParser:
         p.add_argument("--src-mac", default="00:00:00:00:00:01")
         p.add_argument("--dst-mac", default="00:00:00:00:00:02")
         p.add_argument("--reflectors", help="file of reflector addresses, one per line")
+        p.add_argument("--carpet", help="spread the destination at random over this IPv4 prefix")
         p.add_argument("--server", default="127.0.0.1")
         p.add_argument("--trex-port", type=int, default=0)
         p.add_argument("--out", help="write results JSON here")
@@ -129,6 +131,8 @@ def main(argv: list[str] | None = None) -> int:
         args.host = args.victim
     if "all" in args.profile:
         args.profile = catalog.emittable()
+        if args.carpet:
+            args.profile = [p for p in args.profile if catalog.SPECS[p].src_mode is not SrcMode.REFLECTOR]
     else:
         unknown = [p for p in args.profile if p not in catalog.SPECS]
         if unknown:
@@ -138,7 +142,15 @@ def main(argv: list[str] | None = None) -> int:
             for name in deferred:
                 print(f"{name}: {catalog.REASONS.get(name, 'not emittable')}", file=sys.stderr)
             raise SystemExit("refusing to run non-emittable methods")
-    return do_dry_run(args) if args.command == "dry-run" else do_run(args)
+        amplified = [p for p in args.profile if catalog.SPECS[p].src_mode is SrcMode.REFLECTOR]
+        if args.carpet and amplified:
+            raise SystemExit(
+                f"--carpet sets the destination, which contradicts the reflector list of: {', '.join(amplified)}"
+            )
+    try:
+        return do_dry_run(args) if args.command == "dry-run" else do_run(args)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
 
 
 if __name__ == "__main__":

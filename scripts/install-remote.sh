@@ -28,7 +28,7 @@ tar czf - -C "$MHDDOS_DIR" start.py files \
   | ssh "$HOST" "mkdir -p $PREFIX/MHDDoS && tar xzf - -C $PREFIX/MHDDoS"
 
 scp -q "$WORK/mhddos-trex" "$HOST:/usr/local/bin/mhddos-trex"
-scp -q "$REPO/docs/agent-usage-261116.md" "$HOST:$PREFIX/AGENT-USAGE.md"
+scp -q "$REPO/docs/agent-usage-261119.md" "$HOST:$PREFIX/AGENT-USAGE.md"
 
 ssh "$HOST" "set -eu
 $PYTHON -m pip install --quiet --no-deps --no-build-isolation --root-user-action=ignore --upgrade --target $PREFIX/lib $PREFIX/stage

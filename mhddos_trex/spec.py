@@ -59,6 +59,7 @@ class RunSpec:
     src_prefix: str
     size: int | None = None
     reflectors: tuple[str, ...] = ()
+    carpet: str | None = None
 
 
 @dataclass(frozen=True)

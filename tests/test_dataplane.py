@@ -9,6 +9,7 @@ Point ``TREX_SIM_DIR`` at the directory holding ``bp-sim-64`` to enable.
 """
 
 import contextlib
+import ipaddress
 import os
 import struct
 from pathlib import Path
@@ -41,14 +42,14 @@ def ctx(source):
     return BuildCtx(host="198.19.0.2", port=80, user_agents=source.user_agents, referers=source.referers)
 
 
-def run_spec():
-    return RunSpec("198.19.0.2", 80, 1000, 1, "203.0.113.0/24", None, REFLECTORS)
+def run_spec(carpet=None):
+    return RunSpec("198.19.0.2", 80, 1000, 1, "203.0.113.0/24", None, REFLECTORS, carpet)
 
 
-def emitted(name, source, tmp_path, count=30):
+def emitted(name, source, tmp_path, count=30, carpet=None):
     out = tmp_path / f"{name}.pcap"
     link = LinkSpec("00:00:00:00:00:01", "00:00:00:00:00:02", 210)
-    streams = build_streams(name, run_spec(), link, ctx(source), source)
+    streams = build_streams(name, run_spec(carpet), link, ctx(source), source)
     with contextlib.redirect_stdout(open(os.devnull, "w")):
         _sim().run(streams, outfile=str(out), pkt_limit=count, is_debug=False, tunables=[], silent=True)
     return [Ether(bytes(pkt)) for pkt in rdpcap(str(out))]
@@ -116,3 +117,15 @@ def test_no_generated_frame_exceeds_the_mtu(source, tmp_path):
     for name in catalog.emittable():
         for pkt in emitted(name, source, tmp_path, count=3):
             assert len(bytes(pkt)) <= 1518, name
+
+
+def test_carpet_spreads_the_destination_over_the_prefix(source, tmp_path):
+    """The data plane must draw a fresh address per packet, not one drawn at compile time."""
+    net = ipaddress.ip_network("198.19.0.0/24")
+    for name in ("GET", "UDP", "SYN"):
+        pkts = emitted(name, source, tmp_path, count=40, carpet="198.19.0.0/24")
+        dests = [ipaddress.ip_address(pkt[IP].dst) for pkt in pkts]
+        assert all(d in net for d in dests), name
+        assert len(set(dests)) > 1, f"{name} sent every packet to one host"
+        assert len({pkt[IP].src for pkt in pkts}) > 1, f"{name} kept one source host"
+

@@ -67,9 +67,27 @@ Options that change the attack, not just the rate:
 | `--src-prefix` | source pool for `pool` profiles, default `203.0.113.0/24` |
 | `--size` | pad frames to this L2 size; above 1518 requests jumbo frames |
 | `--reflectors` | file of reflector addresses, one per line, for the amplification profiles |
+| `--carpet` | IPv4 prefix; draw a fresh destination inside it for every packet |
 | `--out` | write the whole result list as JSON |
 
-`run all` exists but starts 36 profiles at once; use it only for a few seconds at low rate.
+`run all` exists but starts 29–36 profiles at once; use it only for a few seconds at low
+rate.
+
+### Carpet bombing
+
+`--carpet <cidr>` aims every packet at a different host inside the prefix, so per-address
+rate limits see one packet each instead of a flood:
+
+```sh
+mhddos-trex run SYN --victim 198.19.0.100 --carpet 198.19.0.0/24 --pps 1000 --seconds 5
+mhddos-trex run all --victim 198.19.0.100 --carpet 198.19.0.0/24 --pps 50 --seconds 1
+```
+
+The field engine draws the address per packet, so the prefix size is what makes the attack
+wide, not the flow count. Source addresses are spoofed too, and because no host is hit
+twice there is no TCP session to keep coherent; `--victim` still only supplies the `Host:`
+header. Naming an amplification profile together with `--carpet` is refused (the reflector
+list *is* the destination); `run all --carpet` silently drops those seven.
 
 ## Safety for an automated caller
 
@@ -112,6 +130,12 @@ rotates over the reflector list. No amplified response volume is produced.
 second executed all 36 emittable profiles, 2,870 frames total, `sent` non-zero and
 `oerrors` 0 for every one of them. GET, DNS, SYN, UDP and ICMP were also run individually
 at 100 pps with zero output errors.
+
+2026-11-19: `run all --carpet 198.19.0.0/24` executed the 29 profiles that accept a carpet
+destination, 650 frames, all non-zero, `oerrors` 0. The destination spread itself is
+checked off hardware, in TRex's own data plane: `tests/test_dataplane.py` runs the profile
+through `bp-sim-64` and asserts every emitted destination lands inside the prefix and that
+the addresses differ packet to packet.
 
 For reference, off hardware the same profiles sustain 1M and 10M pps exactly as asked
 (see the repository README). The 100G link is the ceiling here, not the generator.

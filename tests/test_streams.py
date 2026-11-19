@@ -208,3 +208,55 @@ def test_syn_has_no_payload(source):
     pkt = frame(build_streams("SYN", run(), LINK, ctx(source), source)[0])
     assert pkt[TCP].flags == "S"
     assert not pkt.haslayer(Raw)
+
+
+CARPET = "198.19.0.0/24"
+
+
+def _instruction(stream, name: str) -> dict:
+    return next(i for i in stream.to_json()["vm"]["instructions"] if i.get("name") == name)
+
+
+def test_carpet_moves_the_destination_inside_the_prefix(source):
+    stream = build_streams("UDP", run(carpet=CARPET), LINK, ctx(source), source)[0]
+    net = ipaddress.ip_network(CARPET)
+    dst = _instruction(stream, "dst")
+    assert dst["type"] == "flow_var" and dst["op"] == "random"
+    assert dst["min_value"] == int(net.network_address) + 1
+    assert dst["max_value"] == int(net.broadcast_address) - 1
+
+
+def test_carpet_writes_the_destination_field(source):
+    stream = build_streams("UDP", run(carpet=CARPET), LINK, ctx(source), source)[0]
+    write = next(
+        i for i in stream.to_json()["vm"]["instructions"]
+        if i["type"] == "write_flow_var" and i.get("name") == "dst"
+    )
+    assert write["pkt_offset"] == _offset(frame(stream), IP, "dst")
+
+
+def test_carpet_spoofs_the_source_and_repairs_checksums(source):
+    """Every packet aims at a different host, so no coherent client exists - even the
+    pool profiles go out spoofed, and both checksums need repairing."""
+    for name in ("GET", "SYN", "UDP", "ICMP"):
+        instructions = build_streams(name, run(carpet=CARPET), LINK, ctx(source), source)[0].to_json()["vm"]["instructions"]
+        names = {i.get("name") for i in instructions if i["type"] == "flow_var"}
+        assert {"src", "dst"} <= names, name
+        assert any(i["type"].startswith("fix_checksum") for i in instructions), name
+
+
+def test_carpet_template_points_inside_the_prefix(source):
+    pkt = frame(build_streams("GET", run(carpet=CARPET), LINK, ctx(source), source)[0])
+    assert ipaddress.ip_address(pkt[IP].dst) in ipaddress.ip_network(CARPET)
+
+
+def test_carpet_of_one_address_collapses_to_it(source):
+    stream = build_streams("UDP", run(carpet="198.18.5.10/32"), LINK, ctx(source), source)[0]
+    dst = _instruction(stream, "dst")
+    assert dst["min_value"] == dst["max_value"] == int(ipaddress.ip_address("198.18.5.10"))
+
+
+def test_carpet_refuses_a_reflector_list(source):
+    """The reflector list is the destination; a carpet prefix contradicts it."""
+    with pytest.raises(ValueError):
+        build_streams("DNS", run(carpet=CARPET, reflectors=REFLECTORS), LINK, ctx(source), source)

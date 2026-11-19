@@ -146,9 +146,11 @@ def _vm_pool(spec: AttackSpec, payload_len: int) -> STLScVmRaw | None:
     )
 
 
-def _vm_spoof(spec: AttackSpec, low: int, high: int) -> STLScVmRaw:
+def _vm_spoof(spec: AttackSpec, low: int, high: int, dst: tuple[int, int] | None = None) -> STLScVmRaw:
     instructions = [] if spec.proto is Proto.ICMP else _sport(spec)
     instructions += _spoof("src", "IP.src", low, high)
+    if dst is not None:
+        instructions += _spoof("dst", "IP.dst", dst[0], dst[1])
     instructions += _checksum(spec)
     return STLScVmRaw(instructions)
 
@@ -162,17 +164,23 @@ def _vm_reflector(spec: AttackSpec, reflectors: tuple[str, ...]) -> STLScVmRaw:
     return STLScVmRaw(_cycle("dst", "IP.dst", reflectors) + _checksum(spec))
 
 
-def _src_pool(prefix: str, flows: int) -> list[str]:
-    """Synthetic clients drawn from the configured prefix.
+def _host_range(prefix: str) -> tuple[int, int]:
+    """Addresses a prefix actually holds.
 
-    A /32 or /31 has no usable host range, so the address itself is used rather than
-    stepping outside the prefix the operator asked for.
+    A /31 or /32 has no host range, so it collapses to the address itself rather than
+    stepping outside the prefix the operator asked for. Only IPv4 is accepted: the field
+    engine writes four-byte addresses into ``IP.src``/``IP.dst``.
     """
     net = ipaddress.ip_network(prefix, strict=False)
+    if net.version != 4:
+        raise ValueError(f"{prefix} is not an IPv4 prefix")
     first = int(net.network_address) + 1
     last = int(net.broadcast_address) - 1
-    if last <= first:
-        return [str(net.network_address)] * flows
+    return (first, last) if last >= first else (int(net.network_address),) * 2
+
+
+def _src_pool(prefix: str, flows: int) -> list[str]:
+    first, last = _host_range(prefix)
     span = last - first + 1
     return [str(ipaddress.ip_address(first + (i % span))) for i in range(flows)]
 
@@ -202,9 +210,10 @@ def build_streams(name: str, run: RunSpec, link: LinkSpec, ctx: BuildCtx, source
 
     dport = _dport(name, run, source)
     per_stream = max(1, run.pps // max(1, run.flows))
-    net = ipaddress.ip_network(run.src_prefix, strict=False)
-    low = int(net.network_address) + 1
-    high = max(low, int(net.broadcast_address) - 1)
+    low, high = _host_range(run.src_prefix)
+    carpet = _host_range(run.carpet) if run.carpet else None
+    if carpet and spec.src_mode is SrcMode.REFLECTOR:
+        raise ValueError(f"{name}: --carpet sets the destination, which contradicts a reflector list")
     sources = _src_pool(run.src_prefix, run.flows)
     reflectors = run.reflectors or (run.victim,)
 
@@ -212,7 +221,9 @@ def build_streams(name: str, run: RunSpec, link: LinkSpec, ctx: BuildCtx, source
     for index in range(run.flows):
         payload = spec.build(ctx, index, source) if spec.build else b""
 
-        if spec.src_mode is SrcMode.REFLECTOR:
+        if carpet:
+            src, dst = sources[0], str(ipaddress.ip_address(carpet[0]))
+        elif spec.src_mode is SrcMode.REFLECTOR:
             src, dst = run.victim, reflectors[index % len(reflectors)]
         elif spec.src_mode is SrcMode.RANDOM:
             src, dst = sources[0], run.victim
@@ -225,7 +236,9 @@ def build_streams(name: str, run: RunSpec, link: LinkSpec, ctx: BuildCtx, source
             pkt = pkt / Raw(payload)
         pkt = _pad(_fit(pkt, max(MAX_ETHERNET_FRAME, run.size or 0)), run.size)
 
-        if spec.src_mode is SrcMode.REFLECTOR:
+        if carpet:
+            vm = _vm_spoof(spec, low, high, dst=carpet)
+        elif spec.src_mode is SrcMode.REFLECTOR:
             vm = _vm_reflector(spec, reflectors)
         elif spec.src_mode is SrcMode.RANDOM:
             vm = _vm_spoof(spec, low, high)
